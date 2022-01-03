@@ -39,11 +39,11 @@ class ScheduleProblem(csp.CSP):
     def __init__(self):
 
         self.data = pd.read_csv('Στοιχεία Μαθημάτων.csv') 
-        self.courses = data["Μάθημα"]
-        self.professor = data["Καθηγητής"]
-        self.difficulty = data["Δύσκολο (TRUE/FALSE)"]
-        lab = data["Εργαστήριο (TRUE/FALSE)"]
-        self.semester = data["Εξάμηνο"]
+        self.courses = self.data["Μάθημα"]
+        self.professor = self.data["Καθηγητής"]
+        self.difficulty = self.data["Δύσκολο (TRUE/FALSE)"]
+        lab = self.data["Εργαστήριο (TRUE/FALSE)"]
+        self.semester = self.data["Εξάμηνο"]
 
         finalcourses = []
         finalprofessor = []
