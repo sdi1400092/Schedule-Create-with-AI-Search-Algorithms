@@ -1,39 +1,13 @@
-from numpy import mod
+
+
+from numpy import empty
 import csp
 import pandas as pd
-
-def schedule_constraint(self, avariable, avalue, bvariable, bvalue):
-    "return true if the two neighbors satisfy the constraint when"
-    "they have values a and b"
-    if avalue == bvalue and avariable != bvariable:
-        return False
-    aindex = self.courses.index[avariable]
-    bindex = self.courses.index[bvariable]
-       
-    if avariable[-3:] != 'lab' and bvariable[-3:] != 'lab':
-        if self.semester[aindex] == self.semester[bindex]:
-            if avalue == bvalue:
-                return False
-            
-        if self.difficulty[aindex] == True and self.difficulty[bindex] == True:
-            if abs(avalue - bvalue) < 2:
-                return False
-           
-        if self.professor[aindex] == self.professor[bindex]:
-            if avalue == bvalue:
-                return False
-    elif avariable[-3:] == 'lab':
-        if avariable[0:-4] == bvariable:
-            if avalue - bvalue != 1:
-                return False
-    elif bvariable[-3:] == 'lab':
-        if bvariable[0:-4] == avariable:
-            if bvalue - avalue != 1:
-                return False
-    return True
+import random
+import math
 
 
-class ScheduleProblem(csp.CSP):
+class ScheduleProblem:
 
 
     def __init__(self):
@@ -42,31 +16,34 @@ class ScheduleProblem(csp.CSP):
         self.courses = self.data["Μάθημα"]
         self.professor = self.data["Καθηγητής"]
         self.difficulty = self.data["Δύσκολο (TRUE/FALSE)"]
-        lab = self.data["Εργαστήριο (TRUE/FALSE)"]
+        self.lab = self.data["Εργαστήριο (TRUE/FALSE)"]
         self.semester = self.data["Εξάμηνο"]
 
         finalcourses = []
         finalprofessor = []
         finaldifficulty = []
         finalsemester = []
+        finallab = []
         for i in range(len(self.courses)):
             finalcourses.append(self.courses[i])
             finalprofessor.append(self.professor[i])
             finaldifficulty.append(self.difficulty[i])
             finalsemester.append(self.semester[i])
-            if lab[i] == True:
+            finallab.append(self.lab[i])
+            if self.lab[i] == True:
                 tempa = self.courses[i]
                 tempb = "_lab"
                 finalcourses.append(tempa + tempb)
-                finalprofessor.append('lab')
-                finaldifficulty.append('lab')
-                finalsemester.append('lab')
-                print(finalcourses[-1], finalcourses[-1][0:-4])
+                finalprofessor.append(self.professor[i])
+                finaldifficulty.append(self.difficulty[i])
+                finalsemester.append(self.semester[i])
+                finallab.append(False)
         
         self.courses = finalcourses
         self.professor = finalprofessor
         self.difficulty = finaldifficulty
         self.semester = finalsemester
+        self.lab = finallab
 
         self.domain = {}
         for course in self.courses:
@@ -76,6 +53,8 @@ class ScheduleProblem(csp.CSP):
         for i in range(len(self.courses)):
             listofneighbors = []
             if self.courses[i][-3:] != "lab":
+                if self.lab[i] == True:
+                    listofneighbors.append(self.courses[i+1])
                 for j in range(len(self.courses)):
                     if self.semester[i] == self.semester[j]:
                         if i != j:
@@ -89,26 +68,114 @@ class ScheduleProblem(csp.CSP):
                             listofneighbors.append(self.courses[j])
             else:
                 listofneighbors.append(self.courses[i-1])
+                #listofneighbors = listofneighbors + self.neighbors[self.courses[i-1]]
             self.neighbors[self.courses[i]] = listofneighbors
     
-        csp.CSP.__init__(self.courses, self.domain, self.neighbors, schedule_constraint)
+        self.csp_problem = csp.CSP(self.courses, self.domain, self.neighbors, self.schedule_constraint)
+        self.csp_problem.support_pruning()
 
-    def schedule_assign(self, var, val, assignment):
-        old_val = assignment.get(var, None)
-        if val != old_val:
-            csp.CSP.assign(var, val, assignment)
+    def schedule_constraint(self, avariable, avalue, bvariable, bvalue):
+        "return true if the two neighbors satisfy the constraint when"
+        "they have values a and b"
+        if avalue == bvalue and avariable != bvariable:
+            return False
+        
+        aindex = self.courses.index(avariable)
+        bindex = self.courses.index(bvariable)
+
+        if self.lab[aindex] == True :
+            if bvalue - avalue == 1 and not bvariable[0:-4] == avariable:
+                return False
+                
+            if avalue % 3 == 0:
+                return False
+
+        if self.lab[bindex] == True:
+            if avalue - bvalue == 1 and not avariable[0:-4] == bvariable:
+                return False
+                
+            if bvalue % 3 == 0:
+                return False
+
+        if avariable[-3:] != 'lab' and bvariable[-3:] != 'lab':
+            if self.semester[aindex] == self.semester[bindex]:
+                if int(math.ceil(avalue/3)) == int(math.ceil(bvalue/3)):
+                    return False
+                
+            if self.difficulty[aindex] == True and self.difficulty[bindex] == True:
+                if abs(int(math.ceil(avalue/3)) - int(math.ceil(bvalue/3))) < 2:
+                    return False
+            
+            if self.professor[aindex] == self.professor[bindex]:
+                if int(math.ceil(avalue/3)) == int(math.ceil(bvalue/3)):
+                    return False
+
+        elif avariable[-3:] == 'lab':
+            if avariable[0:-4] == bvariable:
+                if avalue != bvalue + 1:
+                    return False
+        
+        elif bvariable[-3:] == 'lab':
+            if bvariable[0:-4] == avariable:
+                if bvalue != avalue + 1:
+                    return False
+        return True
+
+    def schedule_assign(self, assignment, i):
+
+        temp_var = csp.mrv(assignment, self.csp_problem)
+        temp_val = i % 63 + 1
+
+        if temp_val in self.csp_problem.choices(temp_var):
+            self.csp_problem.assign(temp_var, temp_val, assignment)
+            flag = True
+
+            removals = self.csp_problem.suppose(temp_var, temp_val)
+
+            if not csp.forward_checking(self.csp_problem, temp_var, temp_val, assignment, removals):
+                self.schedule_unassign(temp_var, assignment)
+                flag = False
+            for B in self.neighbors[temp_var]:
+                if B in assignment:
+                    if not self.schedule_constraint(temp_var, temp_val, B, assignment[B]):
+                        self.schedule_unassign(temp_var, assignment)
+                        flag = False
+            
+            if flag:
+                for course in self.courses:
+                    if temp_val in self.csp_problem.curr_domains[course]:
+                        self.csp_problem.prune(course, temp_val, removals)
 
     def schedule_unassign(self, var, assignment):
-        csp.CSP.unassign(var, assignment)
+        self.csp_problem.unassign(var, assignment)
 
     def schedule_display(self, assignment):
-        for course in self.courses:
-            temp = assignment.get(course, None)
-            print('The class', course, 'will be examined at', temp//3, 'day at the')
-            if temp % 3 == 0:
-                print('9:00 - 12:00 slot')
-            elif temp % 3 == 1:
-                print('12:00 to 15:00 slot')
+        sorted_assignment = sorted(assignment.items(), key=lambda x:x[1])
+        for i in sorted_assignment:
+            temp = i[1]
+            course = i[0]
+            if temp % 3 == 1:
+                print('The course', course, 'will be examined at day', int(math.ceil(temp/3)), 'at the 9:00 - 12:00 slot')
+            elif temp % 3 == 2:
+                print('The course', course, 'will be examined at day', int(math.ceil(temp/3)), 'at the 12:00 to 15:00 slot')
             else:
-                print('15:00 to 17:00 slot')
-            print('\n')
+                print('The course', course, 'will be examined at day', int(math.ceil(temp/3)), 'at the 15:00 to 17:00 slot')
+
+
+
+if __name__ == '__main__':
+    
+    schedule_problem = ScheduleProblem()
+
+    assignment = {}
+    while len(assignment) != len(schedule_problem.courses):
+        i = random.randint(1, 63)
+        schedule_problem.schedule_assign(assignment, i)
+
+    # for course in assignment.keys():
+    #     for neighbor in schedule_problem.neighbors[course]:
+    #         print(schedule_problem.schedule_constraint(course, assignment[course], neighbor, assignment[neighbor]))
+    
+    s = set(val for val in assignment.values())
+    print('# of different time zones', len(s))
+    schedule_problem.schedule_display(assignment)
