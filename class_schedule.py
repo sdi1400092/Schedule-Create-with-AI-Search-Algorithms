@@ -1,10 +1,9 @@
 
 
-from numpy import empty
 import csp
 import pandas as pd
-import random
 import math
+import time
 
 
 class ScheduleProblem:
@@ -122,7 +121,7 @@ class ScheduleProblem:
         return True
 
     def schedule_assign(self, assignment, i):
-
+        
         temp_var = csp.mrv(assignment, self.csp_problem)
         temp_val = i % 63 + 1
 
@@ -131,6 +130,7 @@ class ScheduleProblem:
             flag = True
 
             removals = self.csp_problem.suppose(temp_var, temp_val)
+
 
             if not csp.forward_checking(self.csp_problem, temp_var, temp_val, assignment, removals):
                 self.schedule_unassign(temp_var, assignment)
@@ -159,23 +159,30 @@ class ScheduleProblem:
             elif temp % 3 == 2:
                 print('The course', course, 'will be examined at day', int(math.ceil(temp/3)), 'at the 12:00 to 15:00 slot')
             else:
-                print('The course', course, 'will be examined at day', int(math.ceil(temp/3)), 'at the 15:00 to 17:00 slot')
+                print('The course', course, 'will be examined at day', int(math.ceil(temp/3)), 'at the 15:00 to 18:00 slot')
 
 
 
 if __name__ == '__main__':
     
+    start = time.time()
     schedule_problem = ScheduleProblem()
 
+    i = 0
     assignment = {}
     while len(assignment) != len(schedule_problem.courses):
-        i = random.randint(1, 63)
+        i = i + 1
         schedule_problem.schedule_assign(assignment, i)
+    end = time.time()
 
     # for course in assignment.keys():
     #     for neighbor in schedule_problem.neighbors[course]:
     #         print(schedule_problem.schedule_constraint(course, assignment[course], neighbor, assignment[neighbor]))
     
+    #just a check of how many different slots we have
+    #to be sure there are no duplicates
     s = set(val for val in assignment.values())
     print('# of different time zones', len(s))
+
     schedule_problem.schedule_display(assignment)
+    print('Solution for schedule csp found in ', end-start, 'seconds')
