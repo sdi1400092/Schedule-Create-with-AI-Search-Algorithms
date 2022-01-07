@@ -4,6 +4,9 @@ import csp
 import pandas as pd
 import math
 import time
+import random
+
+
 
 
 class ScheduleProblem:
@@ -33,9 +36,9 @@ class ScheduleProblem:
                 tempa = self.courses[i]
                 tempb = "_lab"
                 finalcourses.append(tempa + tempb)
-                finalprofessor.append(self.professor[i])
-                finaldifficulty.append(self.difficulty[i])
-                finalsemester.append(self.semester[i])
+                finalprofessor.append(False)
+                finaldifficulty.append(False)
+                finalsemester.append(False)
                 finallab.append(False)
         
         self.courses = finalcourses
@@ -120,7 +123,7 @@ class ScheduleProblem:
                     return False
         return True
 
-    def schedule_assign(self, assignment, i):
+    def schedule_assign_mrv(self, assignment, i):
         
         temp_var = csp.mrv(assignment, self.csp_problem)
         temp_val = i % 63 + 1
@@ -161,28 +164,128 @@ class ScheduleProblem:
             else:
                 print('The course', course, 'will be examined at day', int(math.ceil(temp/3)), 'at the 15:00 to 18:00 slot')
 
+    def schedule_assign_dom_wdeg(self, assignment, i):
+        
+        temp_var = self.dom_wdeg(assignment, self)
+        temp_val = i % 63 + 1
+
+        if temp_val in self.csp_problem.choices(temp_var) and temp_val not in assignment.values():
+            self.csp_problem.assign(temp_var, temp_val, assignment)
+            flag = True
+
+            removals = self.csp_problem.suppose(temp_var, temp_val)
+
+            if not csp.mac(self.csp_problem, temp_var, temp_val, assignment, removals)[0]:
+                self.schedule_unassign(temp_var, assignment)
+                flag = False
+            for B in self.neighbors[temp_var]:
+                if B in assignment:
+                    if not self.schedule_constraint(temp_var, temp_val, B, assignment[B]):
+                        self.schedule_unassign(temp_var, assignment)
+                        flag = False
+                        
+            # if flag:
+            #     for course in self.courses:
+            #         if temp_val in self.csp_problem.curr_domains[course]:
+            #             self.csp_problem.prune(course, temp_val, removals)
+
+    def schedule_weights(self):
+        #use only when dom/wdeg variable ordering is gonna be used
+        self.weights = {}
+        for A in self.courses:
+            temp_weight = 0
+            aindex = self.courses.index(A)
+            if A[-3:] != 'lab':
+                for B in self.neighbors[A]:
+                    bindex = self.courses.index(B)
+                    if self.difficulty[aindex] == self.difficulty[bindex] == True:
+                        temp_weight += 2
+                    if self.semester[aindex] == self.semester[bindex]:
+                        temp_weight += 1
+                    if self.professor[aindex] == self.professor[bindex]:
+                        temp_weight += 1
+                    self.weights[A+'-'+B] = temp_weight
+            else:
+                temp_weight += 3
+                B = A[0:-4]
+            self.weights[A+'-'+B] = temp_weight
+
+    def dom_wdeg(self, assignment, schedule_problem):
+        
+        dom_dweg_ratio = {}
+        for A in schedule_problem.courses:
+            temp_weight = 0
+            for B in schedule_problem.neighbors[A]:
+                if A not in assignment and B not in assignment:
+                    temp_weight += self.weights[A+'-'+B]
+            if temp_weight != 0:
+                dom_dweg_ratio[A] = len(self.csp_problem.curr_domains[A])/temp_weight
+            else:
+                dom_dweg_ratio[A] = len(self.csp_problem.curr_domains[A])
+
+        templist = []
+        for a in dom_dweg_ratio:
+            templist.append(a)
+        temp = random.choice(templist)
+        while temp in assignment:
+            temp = random.choice(templist)
+
+        min = 30
+        for a in dom_dweg_ratio:
+            if dom_dweg_ratio[a] < min and a not in assignment:
+                min = dom_dweg_ratio[a]
+                temp = a
+        return temp
 
 
 if __name__ == '__main__':
     
     start = time.time()
-    schedule_problem = ScheduleProblem()
+    schedule_problem_mrv = ScheduleProblem()
+    schedule_problem_min_conflicts = ScheduleProblem()
+    schedule_problem_mac = ScheduleProblem()
 
     i = 0
     assignment = {}
-    while len(assignment) != len(schedule_problem.courses):
+    while len(assignment) != len(schedule_problem_mrv.courses):
         i = i + 1
-        schedule_problem.schedule_assign(assignment, i)
+        schedule_problem_mrv.schedule_assign_mrv(assignment, i)
     end = time.time()
-
-    # for course in assignment.keys():
-    #     for neighbor in schedule_problem.neighbors[course]:
-    #         print(schedule_problem.schedule_constraint(course, assignment[course], neighbor, assignment[neighbor]))
+    totaltime = end-start
     
     #just a check of how many different slots we have
     #to be sure there are no duplicates
     s = set(val for val in assignment.values())
     print('# of different time zones', len(s))
 
-    schedule_problem.schedule_display(assignment)
-    print('Solution for schedule csp found in ', end-start, 'seconds')
+    print('Printing results for FC')
+    schedule_problem_mrv.schedule_display(assignment)
+
+    print('Solution for schedule csp with FC found in ', totaltime, 'seconds')
+
+    start = time.time()
+    print('Printing results for min conflicts')
+    schedule_problem_min_conflicts.schedule_display(csp.min_conflicts(schedule_problem_min_conflicts.csp_problem))
+    end = time.time()
+
+    print('Solution with min-conflicts found in ', end-start, 'seconds')
+
+    #DOM_WDEG + MAC
+
+    start = time.time()
+    i = 0
+    assignment = {}
+    schedule_problem_mac.schedule_weights()
+    while len(assignment) != len(schedule_problem_mac.courses):
+        i = i + 1
+        schedule_problem_mac.schedule_assign_dom_wdeg(assignment, i)
+
+    end = time.time()
+    totaltime = end-start
+
+    s = set(val for val in assignment.values())
+    print('# of different time zones', len(s))
+
+    print('Printing results for dom/wdeg + mac')
+    schedule_problem_mac.schedule_display(assignment)
+    print('results found in ', totaltime, 'seconds')
