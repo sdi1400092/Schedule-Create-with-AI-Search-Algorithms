@@ -1,5 +1,6 @@
 
 
+from sys import setswitchinterval
 import csp
 import pandas as pd
 import math
@@ -138,11 +139,11 @@ class ScheduleProblem:
             if not csp.forward_checking(self.csp_problem, temp_var, temp_val, assignment, removals):
                 self.schedule_unassign(temp_var, assignment)
                 flag = False
-            for B in self.neighbors[temp_var]:
-                if B in assignment:
-                    if not self.schedule_constraint(temp_var, temp_val, B, assignment[B]):
-                        self.schedule_unassign(temp_var, assignment)
-                        flag = False
+            # for B in self.neighbors[temp_var]:
+            #     if B in assignment:
+            #         if not self.schedule_constraint(temp_var, temp_val, B, assignment[B]):
+            #             self.schedule_unassign(temp_var, assignment)
+            #             flag = False
             
             if flag:
                 for course in self.courses:
@@ -178,11 +179,11 @@ class ScheduleProblem:
             if not csp.mac(self.csp_problem, temp_var, temp_val, assignment, removals)[0]:
                 self.schedule_unassign(temp_var, assignment)
                 flag = False
-            for B in self.neighbors[temp_var]:
-                if B in assignment:
-                    if not self.schedule_constraint(temp_var, temp_val, B, assignment[B]):
-                        self.schedule_unassign(temp_var, assignment)
-                        flag = False
+            # for B in self.neighbors[temp_var]:
+            #     if B in assignment:
+            #         if not self.schedule_constraint(temp_var, temp_val, B, assignment[B]):
+            #             self.schedule_unassign(temp_var, assignment)
+            #             flag = False
                         
             # if flag:
             #     for course in self.courses:
@@ -235,57 +236,83 @@ class ScheduleProblem:
             if dom_dweg_ratio[a] < min and a not in assignment:
                 min = dom_dweg_ratio[a]
                 temp = a
+        
+        self.csp_problem.count += len(dom_dweg_ratio)
+
         return temp
 
 
 if __name__ == '__main__':
-    
-    start = time.time()
-    schedule_problem_mrv = ScheduleProblem()
-    schedule_problem_min_conflicts = ScheduleProblem()
-    schedule_problem_mac = ScheduleProblem()
 
-    i = 0
-    assignment = {}
-    while len(assignment) != len(schedule_problem_mrv.courses):
-        i = i + 1
-        schedule_problem_mrv.schedule_assign_mrv(assignment, i)
-    end = time.time()
-    totaltime = end-start
-    
-    #just a check of how many different slots we have
-    #to be sure there are no duplicates
-    s = set(val for val in assignment.values())
-    print('# of different time zones', len(s))
+    case = '5'
 
-    print('Printing results for FC')
-    schedule_problem_mrv.schedule_display(assignment)
+    while case != 'exit':
 
-    print('Solution for schedule csp with FC found in ', totaltime, 'seconds')
+        case = input('Please press 1 for MRV + FC, 2 for Min-Conflicts, 3 for Dom/Wdeg + MAC or exit for exit\n')
+        
+        if case == '1':
+            
+            schedule_problem_FC = ScheduleProblem()
 
-    start = time.time()
-    print('Printing results for min conflicts')
-    schedule_problem_min_conflicts.schedule_display(csp.min_conflicts(schedule_problem_min_conflicts.csp_problem))
-    end = time.time()
+            start = time.time()
+            i = 0
+            assignment = {}
+            while len(assignment) != len(schedule_problem_FC.courses):
+                i = i + 1
+                schedule_problem_FC.schedule_assign_mrv(assignment, i)
+            end = time.time()
+            totaltime = end-start
+            
+            #just a check of how many different slots we have
+            #to be sure there are no duplicates
+            s = set(val for val in assignment.values())
+            print('# of different time zones', len(s))
 
-    print('Solution with min-conflicts found in ', end-start, 'seconds')
+            print('Printing results for FC')
+            schedule_problem_FC.schedule_display(assignment)
 
-    #DOM_WDEG + MAC
+            print('Solution for schedule csp with FC found in ', totaltime, 'seconds')
+            print('amount of nodes visited in search expansion tree: ', schedule_problem_FC.csp_problem.count)
+            print('number of checks done: ', schedule_problem_FC.csp_problem.counter)
 
-    start = time.time()
-    i = 0
-    assignment = {}
-    schedule_problem_mac.schedule_weights()
-    while len(assignment) != len(schedule_problem_mac.courses):
-        i = i + 1
-        schedule_problem_mac.schedule_assign_dom_wdeg(assignment, i)
+        elif case == '2':
 
-    end = time.time()
-    totaltime = end-start
+            schedule_problem_min_conflicts = ScheduleProblem()
+            
+            start = time.time()
+            print('Printing results for min conflicts')
+            schedule_problem_min_conflicts.schedule_display(csp.min_conflicts(schedule_problem_min_conflicts.csp_problem))
+            end = time.time()
 
-    s = set(val for val in assignment.values())
-    print('# of different time zones', len(s))
+            print('Solution with min-conflicts found in ', end-start, 'seconds')
+            print('amount of nodes visited in search expansion tree: ', schedule_problem_min_conflicts.csp_problem.count)
+            print('number of checks done: ', schedule_problem_min_conflicts.csp_problem.counter)
 
-    print('Printing results for dom/wdeg + mac')
-    schedule_problem_mac.schedule_display(assignment)
-    print('results found in ', totaltime, 'seconds')
+        elif case == '3':
+
+            schedule_problem_mac = ScheduleProblem()
+
+            start = time.time()
+            i = 0
+            assignment = {}
+            schedule_problem_mac.schedule_weights()
+            while len(assignment) != len(schedule_problem_mac.courses):
+                i = i + 1
+                schedule_problem_mac.schedule_assign_dom_wdeg(assignment, i)
+
+            end = time.time()
+            totaltime = end-start
+
+            s = set(val for val in assignment.values())
+            print('# of different time zones', len(s))
+
+            print('Printing results for dom/wdeg + mac')
+            schedule_problem_mac.schedule_display(assignment)
+            print('results found in ', totaltime, 'seconds')
+
+            print('amount of nodes visited in search expansion tree: ', schedule_problem_mac.csp_problem.count)
+            print('number of checks done: ', schedule_problem_mac.csp_problem.counter)
+
+        elif case == 'exit': print('Hope you liked the results!!!')
+
+        else: print('Incorrect input please try again')

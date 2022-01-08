@@ -61,6 +61,8 @@ class CSP(search.Problem):
         self.constraints = constraints
         self.curr_domains = None
         self.nassigns = 0
+        self.count = 0
+        self.counter = 0
 
     def assign(self, var, val, assignment):
         """Add {var: val} to assignment; Discard the old value if any."""
@@ -79,6 +81,7 @@ class CSP(search.Problem):
 
         # Subclasses may implement this more efficiently
         def conflict(var2):
+            self.counter += 1
             return var2 in assignment and not self.constraints(var, val, var2, assignment[var2])
 
         return count(conflict(v) for v in self.neighbors[var])
@@ -153,6 +156,7 @@ class CSP(search.Problem):
 
     def conflicted_vars(self, current):
         """Return a list of variables in current assignment that are in conflict"""
+        self.counter += len(self.variables)
         return [var for var in self.variables
                 if self.nconflicts(var, current[var], current) > 0]
 
@@ -257,6 +261,7 @@ def AC3b(csp, queue=None, removals=None, arc_heuristic=dom_j_up):
                 for Xk in csp.neighbors[Xj]:
                     if Xk != Xi:
                         queue.add((Xk, Xj))
+    csp.counter += checks
     return True, checks  # CSP is satisfiable
 
 
@@ -350,6 +355,9 @@ def first_unassigned_variable(assignment, csp):
 
 def mrv(assignment, csp):
     """Minimum-remaining-values heuristic."""
+    for a in csp.variables:
+        if a not in assignment:
+            csp.count += 1
     return argmin_random_tie([v for v in csp.variables if v not in assignment],
                              key=lambda var: num_legal_values(csp, var, assignment))
 
@@ -387,6 +395,7 @@ def forward_checking(csp, var, value, assignment, removals):
     for B in csp.neighbors[var]:
         if B not in assignment:
             for b in csp.curr_domains[B][:]:
+                csp.counter += 1
                 if not csp.constraints(var, value, B, b):
                     csp.prune(B, b, removals)
             if not csp.curr_domains[B]:
@@ -438,6 +447,7 @@ def min_conflicts(csp, max_steps=100000):
     for var in csp.variables:
         val = min_conflicts_value(csp, var, current)
         csp.assign(var, val, current)
+        csp.count += 1
     # Now repeatedly choose a random conflicted variable and change it
     for i in range(max_steps):
         conflicted = csp.conflicted_vars(current)
@@ -446,6 +456,8 @@ def min_conflicts(csp, max_steps=100000):
         var = random.choice(conflicted)
         val = min_conflicts_value(csp, var, current)
         csp.assign(var, val, current)
+        csp.count += 1
+    csp.counter += i
     return None
 
 
