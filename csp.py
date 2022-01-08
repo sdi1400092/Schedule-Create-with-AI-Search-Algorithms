@@ -443,19 +443,66 @@ def backtracking_search(csp, select_unassigned_variable=first_unassigned_variabl
 def min_conflicts(csp, max_steps=100000):
     """Solve a CSP by stochastic Hill Climbing on the number of conflicts."""
     # Generate a complete assignment for all variables (probably with conflicts)
+    csp.support_pruning()
     csp.current = current = {}
     for var in csp.variables:
         val = min_conflicts_value(csp, var, current)
         csp.assign(var, val, current)
+        removals = csp.suppose(var, val)
+        for a in csp.variables:
+            csp.counter += 1
+            if a[0:-4] == var:
+                for b in csp.variables:
+                    csp.counter += 1
+                    if b != a:
+                        if val + 1 in csp.curr_domains[b]:
+                            csp.prune(b, val+1, removals)
+                            if b in current:
+                                if current[b] == val + 1:
+                                    csp.unassign(b, current)
+                                    temp = min_conflicts_value(csp, b, current)
+                                    csp.assign(b, temp, current)
+                    # else:
+                    #     if val+1 not in csp.curr_domains[b]:
+                    #         csp.curr_domains[b].append(val+1)
+        for course in csp.variables:
+            if val in csp.curr_domains[course]:
+                csp.prune(course, val, removals)
         csp.count += 1
+
     # Now repeatedly choose a random conflicted variable and change it
+    for a in csp.variables:
+        for i in range(1,64):
+            if i not in current.values():
+                csp.curr_domains[a].append(i)
     for i in range(max_steps):
         conflicted = csp.conflicted_vars(current)
         if not conflicted:
             return current
+        for a in conflicted:
+            csp.counter += 1
+            if a[-3:] == 'lab':
+                for b in conflicted:
+                    if a[0:-4] == b:
+                        break
+                for confl in current:
+                    csp.counter += 1
+                    if current[confl] == current[b] + 1:
+                        csp.curr_domains[a].append(current[confl])
+                        csp.unassign(confl, current)
+                        print(confl)
+                        break
+                val = min_conflicts_value(csp, confl, current)
+                csp.assign(confl, val, current)
         var = random.choice(conflicted)
+        for course in csp.variables:
+                csp.curr_domains[course].append(current[var])
         val = min_conflicts_value(csp, var, current)
         csp.assign(var, val, current)
+        removals = csp.suppose(var, val)
+        for course in csp.variables:
+            if val in csp.curr_domains[course]:
+                csp.prune(course, val, removals)
         csp.count += 1
     csp.counter += i
     return None
@@ -464,7 +511,7 @@ def min_conflicts(csp, max_steps=100000):
 def min_conflicts_value(csp, var, current):
     """Return the value that will give var the least number of conflicts.
     If there is a tie, choose at random."""
-    return argmin_random_tie(csp.domains[var], key=lambda val: csp.nconflicts(var, val, current))
+    return argmin_random_tie(csp.curr_domains[var], key=lambda val: csp.nconflicts(var, val, current))
 
 
 # ______________________________________________________________________________
